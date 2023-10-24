@@ -1,0 +1,94 @@
+src_calib_tagm
+Calibration of the tagger microscope for SRC experiment with GlueX detector at Jefferson Lab Hall D
+Last updated by Bo Yu, 07/07/2021
+
+
+python swif_submit_calib.py src_calib_tagm
+./scripts_calib.csh
+python swif_submit_verify.py src_calib_tagm
+./scripts_verify.csh
+
+
+
+
+
+
+
+
+
+Usage: 
+1. Directory on JLab server
+   >> cd /work/halld2/home/boyu/src_calib_TAGM
+2. Source setenv.csh and ROOT
+   >> source setenv.csh
+   >> source /group/halld/Software/builds/Linux_CentOS7.7-x86_64-gcc4.8.5/root/root-6.08.06/bin/thisroot.csh
+   -Set the environmental variables. Remember to update directory of home folder and various Hall D softwares.
+3. Produce histograms for calibration
+   Produce various histograms based on raw data and existing calibration constants in CCDB
+   >> hd_root -PPLUGINS=TAGM_TW -PTAGMHit:DELTA_T_ADC_TDC_MAX=300 filename.evio
+hd_root -PPLUGINS=TAGM_TW -PNTHREADS=4 -o /volatile/halld/home/boyu/src_calib_tagm/hd_root_$1_0$2.root
+   -Input
+     -PTAGMHit:DELTA_T_ADC_TDC_MAX=300: added to pick up any large intial offsets
+     -PTAGMHit:CUT_FACTOR=0: set the CCDB table integral_cuts to zero so that the pulse height distributions are not interfered
+     -filename.evio: raw data file. For efficient calibrations, should use PS skims of about 500k events
+   -Output
+     -hd_root.root: various histograms includes T-ADC, TDC-ADC, ADC-RF, T-RF, TDC-RF (T is time-walk corrected TDC)
+4. ADC and TDC time offset calibration
+   ADC time is directly aligned with RF bucket, since ADC time is already time-walk corrected through firmware.
+   TDC time is also roughly calibrated with the new ADC time to avoid large offsets to be absorbed in the next step.
+   Both ADC and TDC time should align with RF bucket at this moment.
+   >> python timing.py -b filename.root run_number rf variation
+   -Get the ADC and TDC time offsets by
+   -Input 
+       <1> run_number: should not include the leading zero
+       <2> variation: default or variation=mc
+       <3> filename.root: ROOT file from step 3, ADC-RF and TDC-ADC histograms are used
+   (2) Output
+       <1> adc_offsets-run_number.txt, tdc_offsets-run_number.txt: new TDC offsets relative to zero calibration constants, will be pushed to CCDB in step 6
+       <2> offsets_run_number.txt: new TDC offsets relative to existing calibration constants, will used in step 5 so that we don't have to update CCDB again before that
+       <3> resolution.root, problem-channels.txt: empty files for the moment, will be used in step 7 to check the results
+5. TDC time-walk calibration
+   TDC time is time-walk corrected by fitting the TDC-RF histograms to the assumed functional form. Then histograms are shown to check the fit.
+   >> python tw.py -b filename.root run_number
+   (1) Output
+       <1> results.root: includes TDC-RF histograms and fit functional form
+       <2> tw-corr-run_number.txt: 5 calibration constants, c0, c1, c2, c3, t0. calibrated time T=T-c1*pow(1/(P+c3),c2)-(t0-c0)
+6. Push constants to CCDB
+   >> ./push-to-ccdb.sh run_number variation
+7. Check for bad values in CCDB and update them
+   Check a list of runs and look for bad values in CCDB. Remember to modify the run number in ccdbquery.py.
+   >> python ccdbquery.py
+   (1) Output
+       <1> bad-cols.txt: includes run numbers where column 101 and 102 are mislabelled as 120 and 121
+       <2> bad-adcs/bad-adc-run_number.txt, bad-tdcs/bad-tdc-run_number.txt: includes the channels where ADC or TDC time offsets are unrealistically large(>50ns)
+   If there are any bad values, generate a set of new tables with bad values replaced by default ones
+
+   >> python genDefaults.py
+   -Output: adc_offsets/adc_offsets-run_number.txt, tdc_offsets/tdc_offsets-run_number.txt: updated tables where mislabelled channels are corrected and unrealistically large offsets are set to 10ns
+   
+   Then, follow step 6 to push these tables to CCDB. Return to step 2 for another round of iteration.
+8. Calibration validation
+   >> hd_root -PPLUGINS=TAGM_TW -PTAGMHit:DELTA_T_ADC_TDC_MAX=300 filename.evio
+   -Generate new histograms based on the calibration constants from this iteration
+
+   >> python timing.py -b filename.root run_number validate variation
+   -Perform calibration validation by checking the 
+   -Output: problem-channels.txt: includes the channels where the mean values of the ADC-RF, TDC-RF or TDC-ADC plots are greater than 0.05ns or the sigma of the TDC-ADC plots is greater than 1ns
+
+   >> python timing.py -b filename.root run_number res variation
+   -Get the timing resolution
+   -Output: resolution.root: includes each channel's timing resolution, which is the sigma or FWHM of the T-RF plots
+
+   If there are any problem channels, return to step 4 for another round of iteration.
+
+
+Notes:
+1. To fully align the TAGM with the rest of the detectors, use HLDetectorTiming.
+   The reference RF source is from TAGH. Be sure to calibrate that before TAGM calibration
+2. Location of these scripts in the Hall D softwares: /halld_recon/src/plugins/Calibration/TAGM_TW
+3. Location of a daily-updated sqlite version of CCDB: /group/halld/www/halldweb/html/dist/ccdb.sqlite
+4. Location of rawdata: /cache/halld/RunPeriod-year-month/rawdata/Run######/*.evio
+   Retrieve files from tape: >> jcache get /mss/halld/RunPeriod-year-month/rawdata/Run######/*.evio
+5. Check the existing constants in CCDB: >> ccdb dump /PHOTON_BEAM/microscope/base_time_offset:run_number
+   Download them to a text file: >> ccdb dump /PHOTON_BEAM/microscope/base_time_offset:run_number > filename.txt
+   4 set of tables in CCDB: base_time_offset, fadc_time_offsets, tdc_time_offsets, tdc_timewalk_corrections

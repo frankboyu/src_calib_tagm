@@ -1,0 +1,19 @@
+run ./just_plugin_jobs to submit jobs for a list of runs in runs.dat
+
+You should change the line that specifies COMMAND:
+
+just_plugin.csh runs both the TAGH and TAGM plugins, don't need to change
+
+setup_main.ccdb is a setup script that sets up your halld_recon and which ccdb to use. You should make this yourself, it just needs to source and env file for whatever halld_recon you're using and change the ccdb environmental variables
+
+$run is the run number that is read in, don't need to change
+
+/volatile/.... is a path to where you want the output ROOT files to go. Change this to your own volatile directory. DO NOT USE THE WORK DISK.
+
+The printf lines under the printf line with OTHER_FILES need to be changed to match the path to whereever you keep just_plugins.csh and whatever you call your setup scripts. I include 2 setup scripts so that I can just change the COMMAND line to match which ccdb I want to use.
+
+Under INPUT_FILES I check if the first 5 evio files exist and then use those. The time is set to be 1hr for each evio + 30 min. This is good for most runs. You may not need 5 evios, you can delete some of these lines if you want to use fewer.
+
+You can change the workflow name in the swif commands. This is just what the workflow name will be when you run `swif list` to get the status of your jobs.
+
+You can also change the JOBNAME if you want. This is how you can search for specific jobs in swif and also how you see the text output of your jobs in your /farm_out/ directory.

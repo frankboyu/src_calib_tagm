@@ -1,0 +1,34 @@
+#!/bin/sh
+
+path_to_files=/mss/halld/RunPeriod-2021-11/rawdata/
+
+while read run;
+do
+  echo $run
+  echo "PROJECT gluex" > jscript
+  echo "COMMAND just_plugin.csh setup.csh "$run" /volatile/halld/home/boyu/src_calib_tagm" >> jscript
+  echo "JOBNAME src_calib_tagm"$run >> jscript
+  echo "TRACK   analysis" >> jscript
+  echo "MEMORY  15 GB" >> jscript
+  echo "DISK_SPACE 5 GB" >> jscript
+  echo "OS  centos77" >> jscript
+  echo "SINGLE_JOB  true" >> jscript
+  echo "CPU 8" >> jscript
+  #echo "STD_OUT  /volatile/halld/home/boyu/src_calib_tagm/td.out" >> jscript
+  #echo "STD_ERR  /volatile/halld/home/boyu/src_calib_tagm/td.err" >> jscript
+  
+  printf "OTHER_FILES " >> jscript
+  printf "/work/halld2/home/boyu/src_calib_tagm/just_plugin.csh " >> jscript
+  printf "/work/halld2/home/boyu/src_calib_tagm/setup.csh " >> jscript
+  printf "\n" >> jscript
+  printf "INPUT_FILES " >> jscript
+  if [ -e ${path_to_files}/Run0${run}/hd_rawdata_0${run}_000.evio ]
+  then
+    printf $path_to_files"/Run0"$run"/hd_rawdata_0"$run"_000.evio " >> jscript
+  fi
+  let time=90
+  echo "" >> jscript
+  echo "TIME  "$time >> jscript
+  swif add-jsub -workflow src_calib_tagm -create -script jscript
+done < runs.dat
+swif run -workflow src_calib_tagm

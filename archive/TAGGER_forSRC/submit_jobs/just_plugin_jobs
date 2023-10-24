@@ -1,0 +1,57 @@
+#!/bin/sh
+
+path_to_files=/mss/halld/RunPeriod-2021-08/rawdata/
+
+while read run;
+do
+  file_count=0
+  echo $run
+  echo "PROJECT gluex" > jscript
+  echo "COMMAND just_plugin.csh setup_mainccdb.csh "$run" /volatile/halld/home/tjhague/calib/tagger/check_TAGH/" >> jscript
+  echo "JOBNAME tagger_calib"$run >> jscript
+  echo "TRACK   analysis" >> jscript
+  echo "MEMORY  15 GB" >> jscript
+  echo "DISK_SPACE 5 GB" >> jscript
+  echo "OS  centos77" >> jscript
+  echo "SINGLE_JOB  true" >> jscript
+  echo "CPU 8" >> jscript
+  printf "OTHER_FILES " >> jscript
+  printf "/work/halld2/home/tjhague/calib/tagger/just_plugin.csh " >> jscript
+  printf "/work/halld2/home/tjhague/calib/tagger/setup_mainccdb.csh " >> jscript
+  printf "/work/halld2/home/tjhague/calib/tagger/setup.csh " >> jscript
+  printf "\n" >> jscript
+  printf "INPUT_FILES " >> jscript
+  if [ -e ${path_to_files}/Run0${run}/hd_rawdata_0${run}_000.evio ]
+  then
+    let file_count++
+    printf $path_to_files"/Run0"$run"/hd_rawdata_0"$run"_000.evio " >> jscript
+  fi
+  if [ -e ${path_to_files}/Run0${run}/hd_rawdata_0${run}_001.evio ]
+  then
+    let file_count++
+    printf $path_to_files"/Run0"$run"/hd_rawdata_0"$run"_001.evio " >> jscript
+  fi
+  if [ -e ${path_to_files}/Run0${run}/hd_rawdata_0${run}_002.evio ]
+  then
+    let file_count++
+    printf $path_to_files"/Run0"$run"/hd_rawdata_0"$run"_002.evio " >> jscript
+  fi
+  if [ -e ${path_to_files}/Run0${run}/hd_rawdata_0${run}_003.evio ]
+  then
+    let file_count++
+    printf $path_to_files"/Run0"$run"/hd_rawdata_0"$run"_003.evio " >> jscript
+  fi
+  if [ -e ${path_to_files}/Run0${run}/hd_rawdata_0${run}_004.evio ]
+  then
+    let file_count++
+    printf $path_to_files"/Run0"$run"/hd_rawdata_0"$run"_004.evio " >> jscript
+  fi
+  let time=($file_count*60)+30
+  echo "" >> jscript
+  echo "TIME  "$time >> jscript
+  if [ $file_count -gt 0 ]
+  then
+    swif add-jsub -workflow tagger_calib -create -script jscript
+  fi
+done < runs.dat
+swif run -workflow tagger_calib
